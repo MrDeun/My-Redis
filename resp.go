@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"fmt"
 	"io"
 	"strconv"
 )
@@ -55,4 +56,56 @@ func (r *Resp) readInterger() (x int, n int, err error) {
 		return 0, n, err
 	}
 	return int(val), n, nil
+}
+
+func (r *Resp) Read() (Value, error) {
+	_type, err := r.reader.ReadByte()
+	if err != nil {
+		return Value{}, err
+	}
+
+	switch _type {
+	case ARRAY:
+		return r.readArray()
+	case BULK:
+		return r.readBulk()
+	default:
+		fmt.Printf("Unknown type: %v", string(_type))
+		return Value{}, nil
+	}
+}
+
+func (r *Resp) readBulk() (Value, error) {
+	v := Value{}
+	v.typ = "bulk"
+	len, _, err := r.readInterger()
+	if err != nil {
+		return v, err
+	}
+
+	bulk := make([]byte, len)
+	r.reader.Read(bulk)
+	v.bulk = string(bulk)
+	r.readLine()
+	return v, nil
+}
+
+func (r *Resp) readArray() (Value, error) {
+	v := Value{}
+	v.typ = "array"
+
+	len, _, err := r.readInterger()
+	if err != nil {
+		return v, err
+	}
+	v.array = make([]Value, 0)
+	for i := 0; i < len; i++ {
+		val, err := r.Read()
+		if err != nil {
+			return v, err
+		}
+
+		v.array = append(v.array, val)
+	}
+	return v, nil
 }
